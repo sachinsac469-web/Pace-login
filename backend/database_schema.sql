@@ -1,0 +1,31 @@
+-- Database Schema (SQL) Output
+
+CREATE TABLE IF NOT EXISTS Users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  role TEXT NOT NULL CHECK(role IN ('admin', 'student')),
+  username TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS Batches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  batch_name TEXT NOT NULL,
+  start_date TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS Attendance (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('Present', 'Absent', 'Late')),
+  FOREIGN KEY(student_id) REFERENCES Users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS Exams (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  batch_id INTEGER NOT NULL,
+  subject TEXT NOT NULL,
+  marks_obtained INTEGER,
+  total_marks INTEGER NOT NULL,
+  FOREIGN KEY(batch_id) REFERENCES Batches(id) ON DELETE CASCADE
+);
