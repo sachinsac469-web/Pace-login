@@ -7,6 +7,8 @@ import HomePage from './pages/HomePage';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import QRGenerator from './pages/admin/QRGenerator';
+import AdminBatches from './pages/admin/AdminBatches';
+import AdminExams from './pages/admin/AdminExams';
 import StudentLogin from './pages/student/StudentLogin';
 import StudentDashboard from './pages/student/StudentDashboard';
 
@@ -31,6 +33,12 @@ function App() {
           } />
           <Route path="/admin/qr-generator" element={
             <ProtectedRoute roleRequired="admin"><QRGenerator /></ProtectedRoute>
+          } />
+          <Route path="/admin/batches" element={
+            <ProtectedRoute roleRequired="admin"><AdminBatches /></ProtectedRoute>
+          } />
+          <Route path="/admin/exams" element={
+            <ProtectedRoute roleRequired="admin"><AdminExams /></ProtectedRoute>
           } />
 
           {/* Student Routes */}

@@ -77,6 +77,23 @@ app.post('/api/admin/students', authenticate, reqAdmin, (req, res) => {
   res.json({ id: result.lastInsertRowid });
 });
 
+app.get('/api/admin/exams', authenticate, reqAdmin, (req, res) => {
+  const exams = db.prepare('SELECT * FROM Exams').all();
+  res.json(exams);
+});
+
+app.post('/api/admin/exams', authenticate, reqAdmin, (req, res) => {
+  const { batch_id, subject, date, max_marks } = req.body;
+  const result = db.prepare('INSERT INTO Exams (batch_id, subject, date, max_marks) VALUES (?, ?, ?, ?)').run(batch_id, subject, date, max_marks);
+  res.json({ id: result.lastInsertRowid });
+});
+
+app.post('/api/admin/results', authenticate, reqAdmin, (req, res) => {
+  const { exam_id, student_id, score, feedback } = req.body;
+  const result = db.prepare('INSERT INTO Results (exam_id, student_id, score, feedback) VALUES (?, ?, ?, ?)').run(exam_id, student_id, score, feedback);
+  res.json({ id: result.lastInsertRowid });
+});
+
 app.get('/api/admin/stats', authenticate, reqAdmin, (req, res) => {
     const students = db.prepare("SELECT count(*) as count FROM Users WHERE role = 'student'").get().count;
     const batches = db.prepare("SELECT count(*) as count FROM Batches").get().count;

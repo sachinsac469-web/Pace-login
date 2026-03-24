@@ -55,7 +55,12 @@ const AdminDashboard = () => {
             <Link to="/admin/qr-generator">
               <button>Dynamic QR Generator</button>
             </Link>
-            {/* Additional actions like Manage Batches, etc. can go here */}
+            <Link to="/admin/batches">
+              <button style={{ backgroundColor: 'var(--text-dark)' }}>Manage Batches</button>
+            </Link>
+            <Link to="/admin/exams">
+              <button style={{ backgroundColor: 'var(--text-dark)' }}>Manage Exams</button>
+            </Link>
           </div>
         </div>
       </div>
