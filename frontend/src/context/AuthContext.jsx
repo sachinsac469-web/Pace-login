@@ -23,15 +23,18 @@ export const AuthProvider = ({ children }) => {
   const login = (newToken, userData) => {
     localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('device_token', userData.device_token);
     setToken(newToken);
     setUser(userData);
   };
 
-  const logout = () => {
+  const logout = (message = '') => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('device_token');
     setToken(null);
     setUser(null);
+    if (message) alert(message);
   };
 
   return (

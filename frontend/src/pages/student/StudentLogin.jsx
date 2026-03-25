@@ -1,260 +1,160 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Html5QrcodeScanner } from 'html5-qrcode';
-import axios from 'axios';
 import { motion } from 'framer-motion';
-import { QrCode, User, AlertCircle, CheckCircle, Camera } from 'lucide-react';
+import { QrCode, LogIn, Eye, EyeOff, Info } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import axios from 'axios';
 
 export default function StudentLogin() {
   const navigate = useNavigate();
   const { login } = useAuth() || { login: () => {} };
   const [username, setUsername] = useState('');
-  const [scanResult, setScanResult] = useState(null);
+  const [password, setPassword] = useState('');
+  const [showRegister, setShowRegister] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [isScanning, setIsScanning] = useState(false);
+  const [batches, setBatches] = useState([]);
+  const [selectedBatch, setSelectedBatch] = useState('');
 
   useEffect(() => {
-    let scanner = null;
-    if (isScanning) {
-      // Configuration tailored exactly for mobile scanning
-      // We enforce facingMode: "environment" for the rear camera.
-      scanner = new Html5QrcodeScanner(
-        "qr-reader",
-        { 
-          fps: 10, 
-          qrbox: { width: 250, height: 250 },
-          videoConstraints: { facingMode: "environment" }
-        },
-        false
-      );
+    axios.get(`http://${window.location.hostname}:5000/api/public/batches`)
+      .then(res => setBatches(res.data))
+      .catch(e => console.error("No common batches found"));
+  }, []);
+  const [showPassword, setShowPassword] = useState(false);
+  const [forgotUser, setForgotUser] = useState('');
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [recoveredPassword, setRecoveredPassword] = useState('');
 
-      scanner.render((decodedText) => {
-        setScanResult(decodedText);
-        scanner.clear();
-        setIsScanning(false);
-        handleAttendanceLogin(decodedText);
-      }, (err) => {
-        // Suppress non-critical errors (like no QR found in frame)
-      });
-    }
-
-    return () => {
-      if (scanner) {
-        scanner.clear().catch(e => console.error(e));
-      }
-    };
-  }, [isScanning, username]);
-
-  const handleAttendanceLogin = async (qrData) => {
-    if (!username) {
-      setError("Please enter your Username/Roll No first.");
-      setScanResult(null);
-      return;
-    }
-
+  const handleLogin = async (e) => {
+    e.preventDefault();
     try {
-      setError('');
-      setSuccess('Verifying QR and logging in...');
-      
-      const today = new Date();
-      const expectedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-      const expectedQR = `ATTENDANCE_${expectedDate}`;
-      
-      if (qrData !== expectedQR) {
-        setSuccess('');
-        setError("Invalid or Expired QR Code.");
-        return;
-      }
-
-      if (login) {
-        await login({ username, role: 'student', id: 1, name: 'Student' });
-      }
-
-      try {
-        // Dynamic Hostname specifically for Local Wi-Fi Mobile Testing
-        const apiUrl = `http://${window.location.hostname}:5000/api/attendance/mark`;
-        await axios.post(apiUrl, {
-          username,
-          qrData,
-          status: 'Present'
-        });
-      } catch (e) {
-        console.warn("Backend not active, mock attendance recorded.");
-      }
-
-      setSuccess('Attendance Marked successfully! Redirecting...');
-      setTimeout(() => {
-        navigate('/student/dashboard');
-      }, 1500);
-
+      setError(''); setSuccess('');
+      const res = await axios.post(`http://${window.location.hostname}:5000/api/login`, { username, password });
+      if (login) login(res.data.token, { role: res.data.role, name: res.data.name, session_uuid: res.data.session_uuid });
+      navigate('/student/dashboard');
     } catch (err) {
-      setError("Failed to verify attendance. Please try again.");
-      setSuccess('');
+      setError(err.response?.data?.error || "Login failed");
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    try {
+      setError(''); setRecoveredPassword('');
+      const res = await axios.get(`http://${window.location.hostname}:5000/api/users/forgot-password/${forgotUser}`);
+      setRecoveredPassword(res.data.password);
+    } catch (err) {
+      setError(err.response?.data?.error || "User not found");
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    try {
+      setError(''); setSuccess('');
+      const res = await axios.post(`http://${window.location.hostname}:5000/api/register`, {
+        username, email, password, name, batchName: selectedBatch
+      });
+      setSuccess(res.data.message);
+      setShowRegister(false);
+    } catch (err) {
+      setError(err.response?.data?.error || "Registration failed.");
     }
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: '#F8FAFC',
-      fontFamily: 'Inter, sans-serif',
-      padding: '16px' // Optimized for mobile viewport
-    }}>
-      <style>{`
-        #qr-reader {
-          border-radius: 16px; 
-          border: none !important; 
-          overflow: hidden; 
-          box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-        }
-        #qr-reader button {
-          padding: 12px 24px !important;
-          background-color: #4F46E5 !important;
-          color: white !important;
-          border-radius: 12px !important;
-          border: none !important;
-          font-weight: 600 !important;
-          cursor: pointer !important;
-          margin-top: 12px !important;
-        }
-      `}</style>
-
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4 }}
-        style={{
-          width: '100%',
-          maxWidth: '480px',
-          backgroundColor: '#FFFFFF',
-          borderRadius: '24px',
-          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-          overflow: 'hidden'
-        }}
-      >
-        <div style={{
-          backgroundColor: '#4F46E5',
-          padding: '40px 24px',
-          textAlign: 'center',
-          color: 'white'
-        }}>
-          <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', width: '64px', height: '64px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+    <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card" style={{ maxWidth: '400px', width: '100%' }}>
+        <div className="text-center" style={{ marginBottom: '2rem' }}>
+          <div style={{ backgroundColor: 'var(--bg-color)', width: '64px', height: '64px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: 'var(--primary)' }}>
             <QrCode size={32} />
           </div>
-          <h1 style={{ margin: '0 0 8px', fontSize: '26px', fontWeight: 'bold' }}>Scan to Login</h1>
-          <p style={{ margin: 0, opacity: 0.9, fontSize: '15px' }}>
-            Mark your attendance & access your portal
-          </p>
+          <h2>Pace Login</h2>
+          <p className="text-muted">Student Portal</p>
         </div>
 
-        <div style={{ padding: '32px 24px' }}>
-          {error && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px', backgroundColor: '#FEF2F2', color: '#DC2626', borderRadius: '12px', marginBottom: '24px', fontSize: '15px', fontWeight: '500' }}>
-              <AlertCircle size={20} />
-              {error}
-            </div>
-          )}
-          
-          {success && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px', backgroundColor: '#F0FDF4', color: '#16A34A', borderRadius: '12px', marginBottom: '24px', fontSize: '15px', fontWeight: '500' }}>
-              <CheckCircle size={20} />
-              {success}
-            </div>
-          )}
+        {error && <div className="alert">{error}</div>}
+        {success && <div className="alert success-alert">{success}</div>}
 
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', color: '#64748B', fontSize: '15px', fontWeight: '600', marginBottom: '10px' }}>
-              Student Username
-            </label>
+        {!showRegister ? (
+          <form onSubmit={handleLogin}>
+            <input type="text" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} required />
             <div style={{ position: 'relative' }}>
-              <User size={22} color="#94A3B8" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: '16px' }} />
               <input 
-                type="text"
-                placeholder="e.g. johndoe123"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                disabled={isScanning || success}
-                style={{
-                  width: '100%',
-                  padding: '16px 16px 16px 48px', /* large padding for thumb typing */
-                  borderRadius: '16px',
-                  border: '2px solid #E2E8F0',
-                  fontSize: '16px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.2s',
-                  backgroundColor: (isScanning || success) ? '#F1F5F9' : '#FFFFFF'
-                }}
+                type={showPassword ? "text" : "password"} 
+                placeholder="Password" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                required 
               />
-            </div>
-          </div>
-
-          {!isScanning && !success && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => {
-                if(!username) {
-                  setError("Please enter your username first");
-                } else {
-                  setError('');
-                  setIsScanning(true);
-                }
-              }}
-              style={{
-                width: '100%',
-                padding: '16px', /* Thumb friendly padding */
-                backgroundColor: '#4F46E5',
-                color: '#FFFFFF',
-                borderRadius: '16px',
-                border: 'none',
-                fontSize: '18px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.3)'
-              }}
-            >
-              <Camera size={22} />
-              Request Camera & Scan
-            </motion.button>
-          )}
-
-          {isScanning && (
-            <div style={{ marginTop: '16px' }}>
-              <p style={{ textAlign: 'center', color: '#64748B', fontSize: '15px', marginBottom: '16px', fontWeight: '500' }}>
-                Approve camera permissions if prompted.
-              </p>
-              <div id="qr-reader"></div>
-              <button
-                onClick={() => setIsScanning(false)}
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  marginTop: '20px',
-                  backgroundColor: '#F1F5F9',
-                  color: '#64748B',
-                  borderRadius: '16px',
-                  border: 'none',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
+              <button 
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', padding: 0 }}
               >
-                Cancel Scanning
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} /> }
               </button>
             </div>
-          )}
-        </div>
+            <button type="submit" style={{ width: '100%' }}><LogIn size={18} /> Login</button>
+            
+            <div className="text-center mt-2">
+              <button type="button" className="text-button" onClick={() => setShowForgotModal(true)} style={{ fontSize: '0.85rem', color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                Forgot Password?
+              </button>
+            </div>
+
+            <div className="text-center mt-4">
+              <span className="text-muted">New student? </span>
+              <button type="button" className="secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }} onClick={() => setShowRegister(true)}>Request Access</button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleRegister}>
+            <input type="text" placeholder="Full Name" value={name} onChange={e => setName(e.target.value)} required />
+            <input type="text" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} required />
+            <input type="email" placeholder="Email Address" value={email} onChange={e => setEmail(e.target.value)} required />
+            <select value={selectedBatch} onChange={e => setSelectedBatch(e.target.value)} required>
+              <option value="">-- Select Your Batch --</option>
+              {batches.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
+            </select>
+            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
+            <button type="submit" style={{ width: '100%' }}>Submit Signup Request</button>
+            <div className="text-center mt-4">
+              <button type="button" className="secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }} onClick={() => setShowRegister(false)}>Back to Login</button>
+            </div>
+          </form>
+        )}
       </motion.div>
+
+      {showForgotModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="card" style={{ maxWidth: '350px', width: '90%' }}>
+            <h3>Recovery</h3>
+            <p className="text-muted mb-4">Enter your username to see your password.</p>
+            <form onSubmit={handleForgotPassword}>
+              <input type="text" placeholder="Username" value={forgotUser} onChange={e => setForgotUser(e.target.value)} required autoFocus />
+              
+              {recoveredPassword && (
+                <div style={{ backgroundColor: '#EEF2FF', color: '#4F46E5', padding: '12px', borderRadius: '12px', marginBottom: '16px', fontSize: '14px', border: '1px solid #C7D2FE' }}>
+                  Your password is: <strong>{recoveredPassword}</strong>
+                </div>
+              )}
+
+              {error && <div className="alert">{error}</div>}
+
+              <div className="flex gap-2">
+                {!recoveredPassword && <button type="submit" style={{ flex: 1 }}>Show Password</button>}
+                <button type="button" className="secondary" onClick={() => { setShowForgotModal(false); setRecoveredPassword(''); setForgotUser(''); }} style={{ flex: 1 }}>
+                  {recoveredPassword ? 'Done' : 'Cancel'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

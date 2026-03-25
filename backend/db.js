@@ -1,68 +1,72 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+const mongoose = require('mongoose');
+require('dotenv').config();
 
-const db = new Database(path.join(__dirname, 'database.sqlite'));
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/pace_db';
 
-// Create Tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS Users (
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    role TEXT NOT NULL CHECK(role IN ('admin', 'student')),
-    name TEXT NOT NULL
-  );
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
-  CREATE TABLE IF NOT EXISTS Batches (
-    batch_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    description TEXT
-  );
+const User = require('./models/User');
+const CryptoJS = require('crypto-js');
+const bcrypt = require('bcryptjs');
 
-  CREATE TABLE IF NOT EXISTS StudentsBatches (
-    student_id INTEGER,
-    batch_id INTEGER,
-    FOREIGN KEY(student_id) REFERENCES Users(user_id),
-    FOREIGN KEY(batch_id) REFERENCES Batches(batch_id),
-    PRIMARY KEY(student_id, batch_id)
-  );
+const Batch = require('./models/Batch');
 
-  CREATE TABLE IF NOT EXISTS Attendance (
-    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    student_id INTEGER,
-    date TEXT NOT NULL,
-    status TEXT NOT NULL,
-    FOREIGN KEY(student_id) REFERENCES Users(user_id)
-  );
+const SECRET_KEY = 'PACE_SECRET_2026';
 
-  CREATE TABLE IF NOT EXISTS Exams (
-    exam_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    batch_id INTEGER,
-    subject TEXT NOT NULL,
-    date TEXT NOT NULL,
-    max_marks INTEGER NOT NULL,
-    FOREIGN KEY(batch_id) REFERENCES Batches(batch_id)
-  );
+const seedUsers = async () => {
+  try {
+    // Seed default batch
+    const defaultBatch = await Batch.findOneAndUpdate(
+      { name: 'Fullstack-2024' },
+      {
+        description: 'MERN Stack Development Batch',
+        subjects: [
+          { name: 'Node.js', classesHeld: 0 },
+          { name: 'React', classesHeld: 0 },
+          { name: 'MongoDB', classesHeld: 0 },
+          { name: 'Express', classesHeld: 0 }
+        ]
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
 
-  CREATE TABLE IF NOT EXISTS Results (
-    result_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    exam_id INTEGER,
-    student_id INTEGER,
-    score INTEGER NOT NULL,
-    feedback TEXT,
-    FOREIGN KEY(exam_id) REFERENCES Exams(exam_id),
-    FOREIGN KEY(student_id) REFERENCES Users(user_id)
-  );
-`);
+    const adminPassword = 'admin@123';
+    await User.findOneAndUpdate(
+      { username: 'admin' },
+      {
+        email: 'admin@pace.com',
+        passwordHash: bcrypt.hashSync(adminPassword, 10),
+        passwordEncrypted: CryptoJS.AES.encrypt(adminPassword, SECRET_KEY).toString(),
+        role: 'admin',
+        status: 'active',
+        name: 'Administrator'
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
 
-// Seed Admin User
-const bcrypt = require('bcrypt');
-const getAdmin = db.prepare('SELECT * FROM Users WHERE role = ?').get('admin');
+    const studentPassword = 'user@1';
+    await User.findOneAndUpdate(
+      { username: 'user1' },
+      {
+        email: 'user1@pace.com',
+        passwordHash: bcrypt.hashSync(studentPassword, 10),
+        passwordEncrypted: CryptoJS.AES.encrypt(studentPassword, SECRET_KEY).toString(),
+        role: 'student',
+        status: 'active', // Mandatory for student testing
+        name: 'Test Student',
+        batchName: defaultBatch.name,
+        batch_id: defaultBatch._id
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+    // Seeded
+  } catch (err) {
+    console.error('Error seeding data:', err);
+  }
+};
 
-if (!getAdmin) {
-  const hash = bcrypt.hashSync('admin123', 10);
-  db.prepare('INSERT INTO Users (username, password_hash, role, name) VALUES (?, ?, ?, ?)').run('admin', hash, 'admin', 'Administrator');
-  console.log('Seeded default admin (admin / admin123)');
-}
+seedUsers();
 
-module.exports = db;
+module.exports = mongoose;
